@@ -1,19 +1,25 @@
 const cheerio = require("cheerio");
 const axios = require("axios");
+const Service = require("./comparSet");
 
 var url =
   "https://librairie-viedimpact.com/produit/la-vache-pourpre-seth-godin/";
-const book_data = [];
-const book_url = new Set(); // Utilisation d'un ensemble pour stocker les URLs
-const book_url_trouver = new Set(); // Utilisation d'un ensemble pour stocker les URLs
+const dataBookInfo = [];
+const OldBookUrlKnow = new Set(); // Utilisation d'un ensemble pour stocker les URLs
+const newBookUrlDiscover = new Set(); // Utilisation d'un ensemble pour stocker les URLs
+let lastDiffSetSize = null; // Variable pour stocker la taille de diffSet lors de la dernière itération
+let consecutiveUnchangedSizeCount = 0; // Compteur pour le nombre de fois où diffSet.size reste inchangée
 
 async function getInfo(url, retryCount = 3) {
   try {
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
-    const bookData = $(".single-product-wrapper");
+    const dataBookInfoZone = $(".single-product-wrapper");
     const autreBook = $(".product-title a");
-    bookData.map(function () {
+
+    //parcourir zone cible du site et sauvegarder les infos
+    //dans un tabbleau d'objet
+    dataBookInfoZone.map(function () {
       const book = {};
       book.title = $(this).find(".entry-title").text();
       book.price = $(this).find(".amount bdi:first").text();
@@ -25,20 +31,47 @@ async function getInfo(url, retryCount = 3) {
         })
         .get()
         .join(", ");
-      book_data.push(book);
+      dataBookInfo.push(book);
     });
 
-    book_url.add(url); // Utilisation de .add() pour ajouter à l'ensemble
-    const links = autreBook.map(function () {
-      book_url_trouver.add($(this).attr("href"));
-    });
+    //ajouter notre url au tableau d'url connu
+    OldBookUrlKnow.add(url);
 
-    const diffSet = difference(book_url, book_url_trouver);
+    //ajouter les nouvelle url incconu un objet set
+    autreBook
+      .map(function () {
+        newBookUrlDiscover.add($(this).attr("href"));
+      })
+      .get();
+    // console.log(newBookUrlDiscover);
+
+    const diffSet = difference(OldBookUrlKnow, newBookUrlDiscover);
+    const compareSets = Service.comparaion(OldBookUrlKnow, newBookUrlDiscover);
     myArray = Array.from(diffSet)[0];
-    console.log(book_url_trouver);
-    // console.log(book_url_trouver, diffSet.size,myArray = Array.from(diffSet)[0]);
+    // Si diffSet.size est la même que la dernière itération, incrémentez le compteur
+    if (lastDiffSetSize !== null && compareSets.size === lastDiffSetSize) {
+      consecutiveUnchangedSizeCount++;
+    } else {
+      // Sinon, réinitialisez le compteur
+      consecutiveUnchangedSizeCount = 0;
+      console.log(compareSets.size);
+    }
+
+    // Si le compteur atteint 50, arrêtez la récursion
+    if (consecutiveUnchangedSizeCount >= 50) {
+      console.log(compareSets.size);
+
+      console.log(
+        "Arrêt de la récursion, diffSet.size inchangée pendant 50 itérations."
+      );
+      return;
+    }
+
     if (diffSet.size > 0) {
       getInfo(myArray);
+    } else {
+      console.log("finito !!!");
+      return;
     }
   } catch (error) {
     console.error(`C'est pas top : ${error}`);
