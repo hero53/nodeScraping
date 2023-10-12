@@ -3,9 +3,7 @@ const axios = require("axios");
 const j2cp = require("json2csv").Parser;
 const fs = require("fs");
 const path = require("path");
-
-
-
+const excel = require("exceljs");
 
 const baseUrl = "https://librairie-viedimpact.com/boutique/";
 const dataBookInfo = [];
@@ -31,10 +29,15 @@ async function scrapeMultiplePages() {
     const pageUrl = baseUrl + `page/${i}/`;
     await getInfo(pageUrl);
   }
+  // Maintenant, parcourons les liens collectés pour obtenir des informations détaillées.
+  const workbook = new excel.Workbook();
+  const worksheet = workbook.addWorksheet("Products");
+
+  // Ajoutez des en-têtes au fichier Excel.
+  worksheet.addRow(["Title", "Price", "Is Disponible", "Category"]);
 
   // Maintenant, parcourons les liens collectés pour obtenir des informations détaillées.
-  // for (let i = 0; i < getLink.length; i++) {
-    for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < getLink.length; i++) {
     try {
       const productUrl = getLink[i];
       const productResponse = await axios.get(productUrl);
@@ -51,12 +54,22 @@ async function scrapeMultiplePages() {
         .join(", ");
       dataBookInfo.push(productInfo);
       console.log("Informations du produit collectées : " + productInfo.title);
+      worksheet.addRow([
+        productInfo.title,
+        productInfo.price,
+        productInfo.isDisponible,
+        productInfo.category,
+      ]);
     } catch (error) {
       console.error(
         "Erreur lors de la récupération des informations du produit : " + error
       );
     }
   }
+  // Enregistrez le fichier Excel.
+  const excelFilePath = "products.xlsx";
+  await workbook.xlsx.writeFile(excelFilePath);
+  console.log("Fichier Excel enregistré avec succès : " + excelFilePath);
 
   // Une fois que toutes les informations ont été collectées, vous pouvez les imprimer ou les traiter comme vous le souhaitez.
   console.log("Total de liens trouvés : " + getLink.length);
@@ -64,9 +77,6 @@ async function scrapeMultiplePages() {
     "Total d'informations de produit collectées : " + dataBookInfo.length
   );
   console.log("collection...");
-
-
-
 
   const outputDir = "./data";
   if (!fs.existsSync(outputDir)) {
