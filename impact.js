@@ -34,7 +34,14 @@ async function scrapeMultiplePages() {
   const worksheet = workbook.addWorksheet("Products");
 
   // Ajoutez des en-têtes au fichier Excel.
-  worksheet.addRow(["Title", "Price", "Is Disponible", "Category"]);
+  worksheet.addRow([
+    "Numero",
+    "Title",
+    "Price",
+    "Is Disponible",
+    "Category",
+    "Lien",
+  ]);
 
   // Maintenant, parcourons les liens collectés pour obtenir des informations détaillées.
   for (let i = 0; i < getLink.length; i++) {
@@ -51,14 +58,16 @@ async function scrapeMultiplePages() {
           return $(this).text();
         })
         .get()
-        .join(", ");
+        .join(",");
       dataBookInfo.push(productInfo);
       console.log("Informations du produit collectées : " + productInfo.title);
       worksheet.addRow([
+        i + 1,
         productInfo.title,
         productInfo.price,
         productInfo.isDisponible,
         productInfo.category,
+        productUrl,
       ]);
     } catch (error) {
       console.error(
