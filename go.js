@@ -6,7 +6,8 @@ const j2cp = require("json2csv").Parser;
 const fs = require("fs");
 const path = require("path");
 const excel = require("exceljs");
-const compteur = 2;
+const utile = require("./utile");
+const compteur = 3;
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const baseUrl =
@@ -34,34 +35,38 @@ async function getInfo(url) {
   }
 }
 
-function isURL(str) {
-  const urlPattern = /^(https?:\/\/)?([\w.-]+)\.([a-z.]{2,6})([/\w.-]*)*\/?$/;
-  return urlPattern.test(str);
-}
-
 function getUrlListInfo(objects) {
   objects.map(async (info) => {
     try {
-      if (!isURL(info.site)) {
+      if (!utile.isURL(info.site)) {
         console.log("L'URL n'est pas valide :", info.site);
         info.email = "-";
         return; // Utilisation de 'return' pour passer à l'itération suivante
       }
+      console.log("OK", info.site);
 
       const productResponse = await axios.get(info.site, { httpsAgent: agent });
       const $ = cheerio.load(productResponse.data);
       const pageText = $("body").text();
-      const emailRegex = /\S+@\S+/g;
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}(?![^{]*\})/g;
+      // const emailRegex = /\S+@\S+/g;
       const foundEmails = pageText.match(emailRegex) || [];
 
       if (foundEmails.length > 0) {
         // Si des adresses e-mail sont trouvées, utilisez la première comme adresse e-mail.
-        info.email = foundEmails[0];
+        info.email = foundEmails.join(",");
+        console.log(`Email ${info.site}: ${info.email}`);
       } else {
         info.email = "-";
+        console.log(`Email ${info.site}: ${info.email}`);
       }
     } catch (error) {
-      console.log(error);
+      if (error.code === "EPROTO") {
+        console.log("Erreur SSL : " + error.message);
+      } else {
+        console.log("Erreur inattendue : " + error);
+      }
+      return; //  Passer à l'itération suivante avec 'continue'
     }
   });
 }
@@ -114,7 +119,7 @@ async function scrapeMultiplePages() {
   }
   getUrlListInfo(dataBookInfo);
 
-  console.log(dataBookInfo);
+  // console.log(dataBookInfo);
   console.log(dataBookInfo.length);
 }
 

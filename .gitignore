@@ -1,0 +1,9 @@
+# ignore all .xlsx files
+*.xlsx
+
+
+# only ignore the data file in the current directory, not subdir/data
+/data
+
+# only ignore the node_modules file in the current directory, not subdir/node_modules
+/node_modules
