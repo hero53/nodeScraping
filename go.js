@@ -6,7 +6,9 @@ const j2cp = require("json2csv").Parser;
 const fs = require("fs");
 const path = require("path");
 const excel = require("exceljs");
-const compteur = 3;
+const compteur = 2;
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 
 const baseUrl =
   "https://www.goafricaonline.com/ci/annuaire-resultat?type=company&whatWho=btp&near=false&companySizes=%5B%5D&";
@@ -15,7 +17,7 @@ const getLink = [];
 
 
 const agent = new https.Agent({
-  rejectUnauthorized: true
+  rejectUnauthorized: false
 });
 
 
@@ -126,10 +128,8 @@ async function scrapeMultiplePages() {
     } catch (error) {
       console.log(error);
     }
-  
-  
-
   });
+
   console.log(dataBookInfo);
   console.log(dataBookInfo.length);
   
