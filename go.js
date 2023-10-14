@@ -7,23 +7,17 @@ const fs = require("fs");
 const path = require("path");
 const excel = require("exceljs");
 const compteur = 2;
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const baseUrl =
   "https://www.goafricaonline.com/ci/annuaire-resultat?type=company&whatWho=btp&near=false&companySizes=%5B%5D&";
 const dataBookInfo = [];
 const getLink = [];
 
-
 const agent = new https.Agent({
-  rejectUnauthorized: false
+  rejectUnauthorized: false,
 });
 
-
-//parcourir le site
-// localiser les liens qui se trouve dans a.stretched-link.font-bold
-//sauvegarder les liens dans un tabbleau
 async function getInfo(url) {
   try {
     const response = await axios.get(url);
@@ -41,13 +35,37 @@ async function getInfo(url) {
 }
 
 function isURL(str) {
-  // Utilise une expression régulière pour vérifier si str a un format d'URL valide.
   const urlPattern = /^(https?:\/\/)?([\w.-]+)\.([a-z.]{2,6})([/\w.-]*)*\/?$/;
   return urlPattern.test(str);
 }
-function getEntrepriseEmail(){
-  
+
+function getUrlListInfo(objects) {
+  objects.map(async (info) => {
+    try {
+      if (!isURL(info.site)) {
+        console.log("L'URL n'est pas valide :", info.site);
+        info.email = "-";
+        return; // Utilisation de 'return' pour passer à l'itération suivante
+      }
+
+      const productResponse = await axios.get(info.site, { httpsAgent: agent });
+      const $ = cheerio.load(productResponse.data);
+      const pageText = $("body").text();
+      const emailRegex = /\S+@\S+/g;
+      const foundEmails = pageText.match(emailRegex) || [];
+
+      if (foundEmails.length > 0) {
+        // Si des adresses e-mail sont trouvées, utilisez la première comme adresse e-mail.
+        info.email = foundEmails[0];
+      } else {
+        info.email = "-";
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  });
 }
+
 async function scrapeMultiplePages() {
   for (let i = 1; i <= compteur; i++) {
     const pageUrl = baseUrl + `p=${i}/`;
@@ -86,55 +104,18 @@ async function scrapeMultiplePages() {
       productInfo.site = $('a[rel="dofollow"]:first').attr("href") ?? "-";
       productInfo.localisation =
         $('a[href^="https://maps."]:first').attr("href") ?? "-";
-      // productInfo.category = $(".posted_in a")
-      //   .map(function () {
-      //     return $(this).text();
-      //   })
-      //   .get()
-      //   .join(",");
+
       dataBookInfo.push(productInfo);
-      console.log(
-        `Informations du produit collectées : ${i + 1} ${productInfo.title}`
-      );
     } catch (error) {
       console.error(
         "Erreur lors de la récupération des informations du produit : " + error
       );
     }
   }
-  // console.log(dataBookInfo);
-
-  dataBookInfo.map(async (info) => {
-    try {
-      if (!isURL(info.site)) {
-        console.log("L'URL n'est pas valide :", info.site);
-        info.email = "-";
-        return; // Utilisation de 'return' pour passer à l'itération suivante
-      }
-  
-      const productResponse = await axios.get(info.site,{ httpsAgent: agent });
-      const $ = cheerio.load(productResponse.data);
-      const pageText = $("body").text();
-      const emailRegex = /\S+@\S+/g;
-      const foundEmails = pageText.match(emailRegex) || [];
-  
-      if (foundEmails.length > 0) {
-        // Si des adresses e-mail sont trouvées, utilisez la première comme adresse e-mail.
-        info.email = foundEmails[0];
-
-      } else {
-        info.email = "-";
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  });
+  getUrlListInfo(dataBookInfo);
 
   console.log(dataBookInfo);
   console.log(dataBookInfo.length);
-  
 }
-
-
 
 scrapeMultiplePages();
