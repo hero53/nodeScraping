@@ -64,14 +64,14 @@ async function getInfo(url, retryCount = 3) {
       console.log(
         "Arrêt de la récursion, diffSet.size inchangée pendant 50 itérations."
       );
-      return;
+      return compareSets;
     }
 
     if (diffSet.size > 0) {
       getInfo(myArray);
     } else {
-      console.log("finito !!!");
-      return;
+      console.log(compareSets);
+      return compareSets;
     }
   } catch (error) {
     console.error(`C'est pas top : ${error}`);
