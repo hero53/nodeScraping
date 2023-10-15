@@ -7,13 +7,14 @@ const fs = require("fs");
 const path = require("path");
 const excel = require("exceljs");
 const utile = require("./utile");
-const compteur = 3;
+const compteur = 5;
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const baseUrl =
   "https://www.goafricaonline.com/ci/annuaire-resultat?type=company&whatWho=btp&near=false&companySizes=%5B%5D&";
-const dataBookInfo = [];
-const getLink = [];
+const dataEntrepriseInfo = [];
+const newdataEntrepriseInfo = [];
+const likeArray = [];
 
 const agent = new https.Agent({
   rejectUnauthorized: false,
@@ -23,52 +24,16 @@ async function getInfo(url) {
   try {
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
-    const dataBookInfoZone = $("a.stretched-link.font-bold");
+    const infoZone = $("a.stretched-link.font-bold");
 
-    dataBookInfoZone.each(function () {
-      // getLink.push($(this).find("a.stretched-link.font-bold").attr("href"));
-      getLink.push($(this).attr("href"));
+    infoZone.each(function () {
+      // likeArray.push($(this).find("a.stretched-link.font-bold").attr("href"));
+      likeArray.push($(this).attr("href"));
     });
-    console.log("Nombre de liens trouvés : " + getLink.length);
+    console.log("Nombre de liens trouvés : " + likeArray.length);
   } catch (error) {
     console.log("C'est pas top : " + error);
   }
-}
-
-function getUrlListInfo(objects) {
-  objects.map(async (info) => {
-    try {
-      if (!utile.isURL(info.site)) {
-        console.log("L'URL n'est pas valide :", info.site);
-        info.email = "-";
-        return; // Utilisation de 'return' pour passer à l'itération suivante
-      }
-      console.log("OK", info.site);
-
-      const productResponse = await axios.get(info.site, { httpsAgent: agent });
-      const $ = cheerio.load(productResponse.data);
-      const pageText = $("body").text();
-      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}(?![^{]*\})/g;
-      // const emailRegex = /\S+@\S+/g;
-      const foundEmails = pageText.match(emailRegex) || [];
-
-      if (foundEmails.length > 0) {
-        // Si des adresses e-mail sont trouvées, utilisez la première comme adresse e-mail.
-        info.email = foundEmails.join(",");
-        console.log(`Email ${info.site}: ${info.email}`);
-      } else {
-        info.email = "-";
-        console.log(`Email ${info.site}: ${info.email}`);
-      }
-    } catch (error) {
-      if (error.code === "EPROTO") {
-        console.log("Erreur SSL : " + error.message);
-      } else {
-        console.log("Erreur inattendue : " + error);
-      }
-      return; //  Passer à l'itération suivante avec 'continue'
-    }
-  });
 }
 
 async function scrapeMultiplePages() {
@@ -76,13 +41,13 @@ async function scrapeMultiplePages() {
     const pageUrl = baseUrl + `p=${i}/`;
     await getInfo(pageUrl);
   }
-  console.log(getLink);
+  // console.log(likeArray);
 
   // Maintenant, parcourons les liens collectés pour obtenir des informations détaillées.
-  for (let i = 0; i < getLink.length; i++) {
+  for (let i = 0; i < likeArray.length; i++) {
     // for (let i = 0; i < 3; i++) {
     try {
-      const productUrl = getLink[i];
+      const productUrl = likeArray[i];
       console.log(productUrl);
       const productResponse = await axios.get(productUrl);
       const $ = cheerio.load(productResponse.data);
@@ -99,28 +64,165 @@ async function scrapeMultiplePages() {
             .replace(/\s/g, "");
         })
         .get()
+        .filter((value, index, self) => {
+          return self.indexOf(value) === index;
+        })
         .join(",");
-      // productInfo.reseau = $('.flex.mt-8 a[class^="border-brand-"]')
-      //   .map(function () {
-      //     return $(this).attr("href");
-      //   })
-      //   .get()
-      // .join(",");
       productInfo.site = $('a[rel="dofollow"]:first').attr("href") ?? "-";
       productInfo.localisation =
         $('a[href^="https://maps."]:first').attr("href") ?? "-";
+      productInfo.email = "-";
 
-      dataBookInfo.push(productInfo);
+      dataEntrepriseInfo.push(productInfo);
     } catch (error) {
       console.error(
         "Erreur lors de la récupération des informations du produit : " + error
       );
     }
   }
-  getUrlListInfo(dataBookInfo);
 
-  // console.log(dataBookInfo);
-  console.log(dataBookInfo.length);
+  const workbook = new excel.Workbook();
+  const worksheet = workbook.addWorksheet("Products");
+
+  // Ajoutez des en-têtes au fichier Excel.
+  worksheet.addRow([
+    "Title",
+    "type",
+    "localisation",
+    "contact",
+    "email",
+    "site",
+    "gps",
+  ]);
+  // dataEntrepriseInfo.forEach(async (object) => {
+  //   try {
+  //     if (!utile.isURL(object.site)) {
+  //       console.log("L'URL n'est pas valide :", object.site);
+  //       object.email = "-";
+  //       return; // Utilisation de 'return' pour passer à l'itération suivante
+  //     }
+  //     console.log("OK", object.site);
+
+  //     const productResponse = await axios.get(object.site, {
+  //       httpsAgent: agent,
+  //     });
+  //     const $ = cheerio.load(productResponse.data);
+  //     const pageText = $("body").text();
+  //     const emailRegex =
+  //       /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}(?![^{]*\})/g;
+  //     // const emailRegex = /\S+@\S+/g;
+  //     const foundEmails = pageText.match(emailRegex) || [];
+
+  //     if (foundEmails.length > 0) {
+  //       // Si des adresses e-mail sont trouvées, utilisez la première comme adresse e-mail.
+  //       object.email = foundEmails.join(",");
+  //       newdataEntrepriseInfo.push(object)
+
+  //       console.log(`Email ${object.site}: ${object.email}`);
+  //     } else {
+  //       newdataEntrepriseInfo.push(object)
+
+  //       console.log(`Email ${object.site}: ${object.email}`);
+  //     }
+
+  //     // Maintenant, parcourons les liens collectés pour obtenir des informations détaillées.
+  //     worksheet.addRow([
+  //       object.title,
+  //       object.type,
+  //       object.localisation,
+  //       object.contact,
+  //       object.email,
+  //       object.site,
+  //       object.gps,
+  //     ]);
+  //   } catch (error) {
+  //     if (error.code === "EPROTO") {
+  //       console.log("Erreur SSL : " + error.message);
+  //     } else {
+  //       console.log("Erreur inattendue : " + error);
+  //     }
+  //     return; //  Passer à l'itération suivante avec 'continue'
+  //   }
+  // });
+
+  for (let i = 0; i < dataEntrepriseInfo.length; i++) {
+    const object = dataEntrepriseInfo[i];
+    try {
+      if (!utile.isURL(object.site)) {
+        console.log("L'URL n'est pas valide :", object.site);
+        object.email = "-";
+        worksheet.addRow([
+          object.title,
+          object.type,
+          object.localisation,
+          object.contact,
+          object.email,
+          object.site,
+          object.gps,
+        ]);
+        continue; // Passez à l'itération suivante avec 'continue'
+      }
+
+      console.log("OK", object.site);
+
+      const productResponse = await axios.get(object.site, {
+        httpsAgent: agent,
+      });
+      const $ = cheerio.load(productResponse.data);
+      const pageText = $("body").text();
+      const emailRegex =
+        /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}(?![^{]*\})/g;
+      const foundEmails = pageText.match(emailRegex) || [];
+
+      if (foundEmails.length > 0) {
+        // Si des adresses e-mail sont trouvées, utilisez la première comme adresse e-mail.
+        object.email = foundEmails.join(",");
+        newdataEntrepriseInfo.push(object);
+
+        console.log(`Email ${object.site}: ${object.email}`);
+      } else {
+        object.email = "-";
+        newdataEntrepriseInfo.push(object);
+
+        console.log(`Email ${object.site}: ${object.email}`);
+      }
+
+      worksheet.addRow([
+        object.title,
+        object.type,
+        object.localisation,
+        object.contact,
+        object.email,
+        object.site,
+        object.gps,
+      ]);
+    } catch (error) {
+      if (error.code === "EPROTO") {
+        console.log("Erreur SSL : " + error.message);
+      } else {
+        console.log("Erreur inattendue : " + error);
+      }
+    }
+  }
+
+  console.log(dataEntrepriseInfo);
+
+  const excelFilePath = "products.xlsx";
+  await workbook.xlsx.writeFile(excelFilePath);
+  console.log("Fichier Excel enregistré avec succès : " + excelFilePath);
+
+  // const outputDir = "./data";
+  // if (!fs.existsSync(outputDir)) {
+  //   fs.mkdirSync(outputDir, { recursive: true });
+  // }
+
+  // const outputFilePath = path.join(outputDir, "book.csv");
+  // const parser = new j2cp();
+  // const csv = parser.parse(dataEntrepriseInfo);
+  // fs.writeFileSync(outputFilePath, csv);
+  // console.log("Fichier CSV enregistré avec succès : " + outputFilePath);
+
+  // getUrlListInfo(dataEntrepriseInfo);
 }
 
 scrapeMultiplePages();
